@@ -4498,8 +4498,9 @@ final class TerminalSurface: Identifiable, ObservableObject {
            let integrationDir = Bundle.main.resourceURL?.appendingPathComponent("shell-integration").path {
             setManagedEnvironmentValue("CMUX_SHELL_INTEGRATION", "1")
             setManagedEnvironmentValue("CMUX_SHELL_INTEGRATION_DIR", integrationDir)
+            let resolvedShellName = URL(fileURLWithPath: shell).lastPathComponent
 
-            if URL(fileURLWithPath: shell).lastPathComponent == "zsh" {
+            if resolvedShellName == "zsh" {
                 if GhosttyApp.shared.userGhosttyShellIntegrationMode != "none" {
                     setManagedEnvironmentValue("CMUX_LOAD_GHOSTTY_ZSH_INTEGRATION", "1")
                 }
@@ -4523,7 +4524,7 @@ final class TerminalSurface: Identifiable, ObservableObject {
                 }
 
                 setManagedEnvironmentValue("ZDOTDIR", integrationDir)
-            } else if URL(fileURLWithPath: shell).lastPathComponent == "bash" {
+            } else if resolvedShellName == "bash" {
                 if GhosttyApp.shared.userGhosttyShellIntegrationMode != "none" {
                     setManagedEnvironmentValue("CMUX_LOAD_GHOSTTY_BASH_INTEGRATION", "1")
                 }
