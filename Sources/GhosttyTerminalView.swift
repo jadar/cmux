@@ -4480,7 +4480,6 @@ final class TerminalSurface: Identifiable, ObservableObject {
             ?? getenv("SHELL").map { String(cString: $0) }
             ?? ProcessInfo.processInfo.environment["SHELL"]
             ?? "/bin/zsh"
-        let shellName = URL(fileURLWithPath: shell).lastPathComponent
 
         if let cliBinPath = Bundle.main.resourceURL?.appendingPathComponent("bin").path,
            let managedPath = Self.managedStartupPATH(
@@ -4500,7 +4499,7 @@ final class TerminalSurface: Identifiable, ObservableObject {
             setManagedEnvironmentValue("CMUX_SHELL_INTEGRATION", "1")
             setManagedEnvironmentValue("CMUX_SHELL_INTEGRATION_DIR", integrationDir)
 
-            if shellName == "zsh" {
+            if URL(fileURLWithPath: shell).lastPathComponent == "zsh" {
                 if GhosttyApp.shared.userGhosttyShellIntegrationMode != "none" {
                     setManagedEnvironmentValue("CMUX_LOAD_GHOSTTY_ZSH_INTEGRATION", "1")
                 }
@@ -4524,7 +4523,7 @@ final class TerminalSurface: Identifiable, ObservableObject {
                 }
 
                 setManagedEnvironmentValue("ZDOTDIR", integrationDir)
-            } else if shellName == "bash" {
+            } else if URL(fileURLWithPath: shell).lastPathComponent == "bash" {
                 if GhosttyApp.shared.userGhosttyShellIntegrationMode != "none" {
                     setManagedEnvironmentValue("CMUX_LOAD_GHOSTTY_BASH_INTEGRATION", "1")
                 }
