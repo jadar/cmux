@@ -1121,6 +1121,41 @@ final class GhosttyTerminalStartupEnvironmentTests: XCTestCase {
         XCTAssertEqual(merged["COLORTERM"], TerminalSurface.managedColorTerm)
         XCTAssertEqual(merged["TERM_PROGRAM"], TerminalSurface.managedTerminalProgram)
     }
+
+    func testManagedStartupPATHSkipsFishShellPATHOverride() {
+        XCTAssertNil(
+            TerminalSurface.managedStartupPATH(
+                shellPath: "/opt/homebrew/bin/fish",
+                cliBinPath: "/Applications/cmux.app/Contents/Resources/bin",
+                explicitPath: nil,
+                fallbackPath: "/usr/bin:/bin:/Users/tester/.asdf/shims"
+            )
+        )
+    }
+
+    func testManagedStartupPATHPrependsBundledCLIForZsh() {
+        XCTAssertEqual(
+            TerminalSurface.managedStartupPATH(
+                shellPath: "/bin/zsh",
+                cliBinPath: "/Applications/cmux.app/Contents/Resources/bin",
+                explicitPath: nil,
+                fallbackPath: "/usr/bin:/bin"
+            ),
+            "/Applications/cmux.app/Contents/Resources/bin:/usr/bin:/bin"
+        )
+    }
+
+    func testManagedStartupPATHLeavesExistingBundledCLIEntryInPlace() {
+        XCTAssertEqual(
+            TerminalSurface.managedStartupPATH(
+                shellPath: "/bin/bash",
+                cliBinPath: "/Applications/cmux.app/Contents/Resources/bin",
+                explicitPath: "/Applications/cmux.app/Contents/Resources/bin:/usr/bin:/bin",
+                fallbackPath: "/usr/bin:/bin"
+            ),
+            "/Applications/cmux.app/Contents/Resources/bin:/usr/bin:/bin"
+        )
+    }
 }
 
 @MainActor

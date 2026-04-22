@@ -3871,6 +3871,26 @@ final class TerminalSurface: Identifiable, ObservableObject {
         return merged
     }
 
+    static func managedStartupPATH(
+        shellPath: String,
+        cliBinPath: String,
+        explicitPath: String?,
+        fallbackPath: String?
+    ) -> String? {
+        let shellName = URL(fileURLWithPath: shellPath).lastPathComponent
+        if shellName == "fish" {
+            return nil
+        }
+
+        let currentPath = explicitPath ?? fallbackPath ?? ""
+        if currentPath.split(separator: ":").contains(Substring(cliBinPath)) {
+            return currentPath
+        }
+
+        let separator = currentPath.isEmpty ? "" : ":"
+        return "\(cliBinPath)\(separator)\(currentPath)"
+    }
+
     func isAttached(to view: GhosttyNSView) -> Bool {
         attachedView === view && surface != nil
     }
@@ -4456,15 +4476,21 @@ final class TerminalSurface: Identifiable, ObservableObject {
             setManagedEnvironmentValue("CMUX_GEMINI_HOOKS_DISABLED", "1")
         }
 
-        if let cliBinPath = Bundle.main.resourceURL?.appendingPathComponent("bin").path {
-            let currentPath = env["PATH"]
-                ?? getenv("PATH").map { String(cString: $0) }
-                ?? ProcessInfo.processInfo.environment["PATH"]
-                ?? ""
-            if !currentPath.split(separator: ":").contains(Substring(cliBinPath)) {
-                let separator = currentPath.isEmpty ? "" : ":"
-                setManagedEnvironmentValue("PATH", "\(cliBinPath)\(separator)\(currentPath)")
-            }
+        let shell = (env["SHELL"]?.isEmpty == false ? env["SHELL"] : nil)
+            ?? getenv("SHELL").map { String(cString: $0) }
+            ?? ProcessInfo.processInfo.environment["SHELL"]
+            ?? "/bin/zsh"
+        let shellName = URL(fileURLWithPath: shell).lastPathComponent
+
+        if let cliBinPath = Bundle.main.resourceURL?.appendingPathComponent("bin").path,
+           let managedPath = Self.managedStartupPATH(
+               shellPath: shell,
+               cliBinPath: cliBinPath,
+               explicitPath: env["PATH"],
+               fallbackPath: getenv("PATH").map { String(cString: $0) }
+                   ?? ProcessInfo.processInfo.environment["PATH"]
+           ) {
+            setManagedEnvironmentValue("PATH", managedPath)
         }
 
         // Shell integration: inject ZDOTDIR wrapper for zsh shells.
@@ -4474,11 +4500,6 @@ final class TerminalSurface: Identifiable, ObservableObject {
             setManagedEnvironmentValue("CMUX_SHELL_INTEGRATION", "1")
             setManagedEnvironmentValue("CMUX_SHELL_INTEGRATION_DIR", integrationDir)
 
-            let shell = (env["SHELL"]?.isEmpty == false ? env["SHELL"] : nil)
-                ?? getenv("SHELL").map { String(cString: $0) }
-                ?? ProcessInfo.processInfo.environment["SHELL"]
-                ?? "/bin/zsh"
-            let shellName = URL(fileURLWithPath: shell).lastPathComponent
             if shellName == "zsh" {
                 if GhosttyApp.shared.userGhosttyShellIntegrationMode != "none" {
                     setManagedEnvironmentValue("CMUX_LOAD_GHOSTTY_ZSH_INTEGRATION", "1")
