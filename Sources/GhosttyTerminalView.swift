@@ -3872,23 +3872,16 @@ final class TerminalSurface: Identifiable, ObservableObject {
     }
 
     static func managedStartupPATH(
-        shellPath: String,
         cliBinPath: String,
         explicitPath: String?,
         fallbackPath: String?
-    ) -> String? {
-        let shellName = URL(fileURLWithPath: shellPath).lastPathComponent
-        if shellName == "fish" {
-            return nil
-        }
-
+    ) -> String {
         let currentPath = explicitPath ?? fallbackPath ?? ""
         if currentPath.split(separator: ":").contains(Substring(cliBinPath)) {
             return currentPath
         }
 
-        let separator = currentPath.isEmpty ? "" : ":"
-        return "\(cliBinPath)\(separator)\(currentPath)"
+        return currentPath.isEmpty ? cliBinPath : "\(currentPath):\(cliBinPath)"
     }
 
     func isAttached(to view: GhosttyNSView) -> Bool {
@@ -4481,14 +4474,13 @@ final class TerminalSurface: Identifiable, ObservableObject {
             ?? ProcessInfo.processInfo.environment["SHELL"]
             ?? "/bin/zsh"
 
-        if let cliBinPath = Bundle.main.resourceURL?.appendingPathComponent("bin").path,
-           let managedPath = Self.managedStartupPATH(
-               shellPath: shell,
-               cliBinPath: cliBinPath,
-               explicitPath: env["PATH"],
-               fallbackPath: getenv("PATH").map { String(cString: $0) }
-                   ?? ProcessInfo.processInfo.environment["PATH"]
-           ) {
+        if let cliBinPath = Bundle.main.resourceURL?.appendingPathComponent("bin").path {
+            let managedPath = Self.managedStartupPATH(
+                cliBinPath: cliBinPath,
+                explicitPath: env["PATH"],
+                fallbackPath: getenv("PATH").map { String(cString: $0) }
+                    ?? ProcessInfo.processInfo.environment["PATH"]
+            )
             setManagedEnvironmentValue("PATH", managedPath)
         }
 

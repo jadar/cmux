@@ -1127,9 +1127,10 @@ _cmux_install_prompt_command() {
     fi
 }
 
-# Ensure Resources/bin is at the front of PATH, and remove the app's
-# Contents/MacOS entry so the GUI cmux binary cannot shadow the CLI cmux.
-# Shell init (.bashrc/.bash_profile) may prepend other dirs after launch.
+# Ensure Resources/bin is present in PATH without disturbing the user's
+# existing precedence, and remove the app's Contents/MacOS entry so the GUI
+# cmux binary cannot shadow the CLI cmux.
+# Shell init (.bashrc/.bash_profile) may mutate PATH after launch.
 _cmux_fix_path() {
     if [[ -n "${GHOSTTY_BIN_DIR:-}" ]]; then
         local gui_dir="${GHOSTTY_BIN_DIR%/}"
@@ -1140,7 +1141,7 @@ _cmux_fix_path() {
             new_path="${new_path//:${gui_dir}:/:}"
             new_path="${new_path#:}"
             new_path="${new_path%:}"
-            PATH="${bin_dir}:${new_path}"
+            PATH="${new_path:+${new_path}:}${bin_dir}"
         fi
     fi
 }

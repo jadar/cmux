@@ -1122,38 +1122,105 @@ final class GhosttyTerminalStartupEnvironmentTests: XCTestCase {
         XCTAssertEqual(merged["TERM_PROGRAM"], TerminalSurface.managedTerminalProgram)
     }
 
-    func testManagedStartupPATHSkipsFishShellPATHOverride() {
-        XCTAssertNil(
+    func testManagedStartupPATHPreservesExistingOrderWhenAppendingBundledCLI() {
+        XCTAssertEqual(
             TerminalSurface.managedStartupPATH(
-                shellPath: "/opt/homebrew/bin/fish",
                 cliBinPath: "/Applications/cmux.app/Contents/Resources/bin",
                 explicitPath: nil,
-                fallbackPath: "/usr/bin:/bin:/Users/tester/.asdf/shims"
-            )
+                fallbackPath: "/Users/tester/.asdf/shims:/usr/bin:/bin"
+            ),
+            "/Users/tester/.asdf/shims:/usr/bin:/bin:/Applications/cmux.app/Contents/Resources/bin"
         )
     }
 
-    func testManagedStartupPATHPrependsBundledCLIForZsh() {
+    func testManagedStartupPATHUsesOnlyBundledCLIWhenPATHIsEmpty() {
         XCTAssertEqual(
             TerminalSurface.managedStartupPATH(
-                shellPath: "/bin/zsh",
                 cliBinPath: "/Applications/cmux.app/Contents/Resources/bin",
                 explicitPath: nil,
-                fallbackPath: "/usr/bin:/bin"
+                fallbackPath: nil
             ),
-            "/Applications/cmux.app/Contents/Resources/bin:/usr/bin:/bin"
+            "/Applications/cmux.app/Contents/Resources/bin"
         )
     }
 
     func testManagedStartupPATHLeavesExistingBundledCLIEntryInPlace() {
         XCTAssertEqual(
             TerminalSurface.managedStartupPATH(
-                shellPath: "/bin/bash",
                 cliBinPath: "/Applications/cmux.app/Contents/Resources/bin",
-                explicitPath: "/Applications/cmux.app/Contents/Resources/bin:/usr/bin:/bin",
+                explicitPath: "/Users/tester/.asdf/shims:/Applications/cmux.app/Contents/Resources/bin:/usr/bin:/bin",
                 fallbackPath: "/usr/bin:/bin"
             ),
-            "/Applications/cmux.app/Contents/Resources/bin:/usr/bin:/bin"
+            "/Users/tester/.asdf/shims:/Applications/cmux.app/Contents/Resources/bin:/usr/bin:/bin"
+        )
+    }
+
+    func testShellIntegrationPreservesUserPATHPrecedenceInZsh() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("cmux-zsh-path-order-\(UUID().uuidString)")
+        let appPath = root.appendingPathComponent("cmux.app", isDirectory: true)
+        let guiDir = appPath.appendingPathComponent("Contents/MacOS", isDirectory: true)
+        let resourcesBinDir = appPath.appendingPathComponent("Contents/Resources/bin", isDirectory: true)
+
+        try fileManager.createDirectory(at: guiDir, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: resourcesBinDir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+
+        let output = try runPromptInteractiveZsh(
+            cmuxLoadGhosttyIntegration: false,
+            cmuxLoadShellIntegration: true,
+            command: """
+            print -r -- "$PATH" >> "$CMUX_TEST_OUTPUT"
+            """,
+            extraEnvironment: [
+                "PATH": "/Users/tester/.asdf/shims:\(guiDir.path):/usr/bin:/bin",
+                "GHOSTTY_BIN_DIR": guiDir.path,
+            ],
+            userZshRCContents: """
+            cmux_test_ready() {
+              [[ -e "$CMUX_TEST_READY" ]] && return 0
+              : > "$CMUX_TEST_READY"
+              precmd_functions=(${precmd_functions:#cmux_test_ready})
+            }
+            precmd_functions+=(cmux_test_ready)
+            """
+        )
+
+        XCTAssertEqual(
+            output,
+            "/Users/tester/.asdf/shims:/usr/bin:/bin:\(resourcesBinDir.path)",
+            output
+        )
+    }
+
+    func testShellIntegrationPreservesUserPATHPrecedenceInBash() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("cmux-bash-path-order-\(UUID().uuidString)")
+        let appPath = root.appendingPathComponent("cmux.app", isDirectory: true)
+        let guiDir = appPath.appendingPathComponent("Contents/MacOS", isDirectory: true)
+        let resourcesBinDir = appPath.appendingPathComponent("Contents/Resources/bin", isDirectory: true)
+
+        try fileManager.createDirectory(at: guiDir, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: resourcesBinDir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+
+        let result = try runInteractiveBash(
+            cmuxLoadShellIntegration: true,
+            command: """
+            printf '%s\\n' "$PATH"
+            """,
+            extraEnvironment: [
+                "PATH": "/Users/tester/.asdf/shims:\(guiDir.path):/usr/bin:/bin",
+                "GHOSTTY_BIN_DIR": guiDir.path,
+            ]
+        )
+
+        XCTAssertEqual(
+            result.stdout,
+            "/Users/tester/.asdf/shims:/usr/bin:/bin:\(resourcesBinDir.path)",
+            result.stdout
         )
     }
 }
